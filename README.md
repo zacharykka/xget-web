@@ -4,11 +4,13 @@
 
 ## ✨ 功能亮点
 
-- 🎯 **智能识别**：基于域名匹配自动识别 GitHub、GitLab、包管理、AI 模型、容器仓库等平台
-- ⚡ **实时转换**：输入原始 URL 后立即展示加速链接
+- 🎯 **智能识别**：扩展多平台域名匹配（GitHub Raw、Hugging Face CDN、容器仓库、AI 推理接口等）
+- ⚡ **实时转换**：输入原始 URL 后立即展示加速链接，并自动补全缺失的协议头
 - 🔐 **统一域名**：前端按配置文件/环境变量注入的 Xget 实例域名输出结果，避免在页面暴露
-- 📚 **可拓展映射**：通过 `src/platforms.ts` 维护平台前缀映射，便于后续扩容
-- 🚀 **多种部署**：同时提供 Cloudflare Pages 与容器镜像部署方案
+- 🧭 **清晰反馈**：错误高亮、状态提示与一键复制体验
+- 📚 **可拓展映射**：通过 `src/platforms.ts` 维护平台前缀映射，配套单元测试保障规则准确性
+- 📱 **PWA 支持**：内置 manifest、Service Worker，可在支持的浏览器内离线访问
+- 📊 **可选埋点**：通过环境变量配置批量上报端点，借助 `navigator.sendBeacon` 汇总使用情况
 
 ## 🧱 技术栈
 
@@ -20,7 +22,7 @@
 
 ```bash
 # 安装依赖
-npm install
+npm install --registry=https://registry.npmjs.org/
 
 # 开发模式
 npm run dev
@@ -37,43 +39,58 @@ npm run preview
 | 平台 | 前缀 | 示例原始地址 | 转换后地址 |
 | --- | --- | --- | --- |
 | GitHub | `gh` | `https://github.com/xixu-me/Xget` | `https://xget.xi-xu.me/gh/xixu-me/Xget` |
+| GitHub Raw | `gh` | `https://raw.githubusercontent.com/xixu-me/Xget/main/README.md` | `https://xget.xi-xu.me/gh/xixu-me/Xget/main/README.md` |
 | Hugging Face | `hf` | `https://huggingface.co/microsoft/phi-2` | `https://xget.xi-xu.me/hf/microsoft/phi-2` |
 | npm | `npm` | `https://registry.npmjs.org/react/-/react-18.2.0.tgz` | `https://xget.xi-xu.me/npm/react/-/react-18.2.0.tgz` |
 | conda 官方 | `conda` | `https://repo.anaconda.com/pkgs/main/linux-64/numpy-1.26.3.conda` | `https://xget.xi-xu.me/conda/pkgs/main/linux-64/numpy-1.26.3.conda` |
 | conda 社区 | `conda` | `https://conda.anaconda.org/conda-forge/linux-64/repodata.json` | `https://xget.xi-xu.me/conda/community/conda-forge/linux-64/repodata.json` |
+| AI 推理接口 | `ip` | `https://api.openai.com/v1/chat/completions` | `https://xget.xi-xu.me/ip/v1/chat/completions` |
 | 容器镜像 | `cr` | `https://ghcr.io/xixu-me/xget:latest` | `https://xget.xi-xu.me/cr/xixu-me/xget:latest` |
 
-> 完整平台列表与描述详见 `src/platforms.ts`，如需新增平台，只需补充匹配规则并调整描述。
+> 完整平台列表与描述详见 `src/platforms.ts`，如需新增平台，只需补充匹配规则并调整描述，同时更新测试用例。
 
-## ⚙️ 配置 Xget 实例域名
+## ⚙️ 配置
 
-- 开发或构建阶段：在 `.env` 中写入 `VITE_XGET_BASE=https://xget.your-domain.com`
-- Cloudflare Pages：使用 `wrangler secret put VITE_XGET_BASE` 或在环境变量面板设置同名变量
-- Docker/容器部署：构建前在环境中写入 `VITE_XGET_BASE`，如：
+### Xget 实例域名
 
-  ```bash
-  VITE_XGET_BASE=https://xget.your-domain.com npm run build
-  ```
+- `.env` 或运行环境：设置 `VITE_XGET_BASE=https://xget.your-domain.com`
+- Cloudflare Pages：在环境变量面板设置 `VITE_XGET_BASE`
+- Docker 构建：`VITE_XGET_BASE=... npm run build`
 
-运行时前端不会显示该域名，只在转换结果中使用。
+### 批量埋点
 
-## ☁️ Cloudflare Pages 部署
+- `VITE_ANALYTICS_ENDPOINT=https://example.com/collect` ：设置埋点上报服务地址
+- `VITE_ANALYTICS_BATCH_SIZE=10`（可选）：队列长度到达阈值立即 flush，默认 `5`
+- `VITE_ANALYTICS_FLUSH_INTERVAL=15000`（可选）：批量定时上报间隔（毫秒），默认 `10000`
 
-1. 本地构建产物：`npm run build`
-2. 通过 Wrangler 部署（需提前执行 `wrangler login` 完成授权）：
+### PWA
 
-   ```bash
-   npx wrangler pages deploy dist --project-name=xget-url-converter
-   ```
+- manifest 与 Service Worker 已自动注册，部署后可在浏览器 DevTools 的 Application 面板看到缓存内容
 
-3. 或者在 Cloudflare Pages 控制台新建项目：
-   - Build 命令：`npm run build`
-   - Build 输出目录：`dist`
-   - Node 版本建议 `20.x`
+## 🧪 测试与冒烟
 
-`wrangler.toml` 已内置 `pages_build_output_dir = "dist"`，如需在 Cloudflare 端自定义默认域名，使用环境变量 `VITE_XGET_BASE`。
+```bash
+npm run test          # Vitest 单元测试
+npm run smoke:offline # 构建 + preview + 关键文件探活
+```
 
-## 📦 容器部署
+> Vitest 在受限环境下可能输出一次 `listen EPERM 0.0.0.0:24678`，为沙箱阻止监听端口所致，不影响测试结论。
+
+离线冒烟脚本会自动：
+1. 执行生产构建
+2. 启动 `npm run preview -- --host 127.0.0.1 --port 5010`
+3. 拉取 `index.html` 及 `sw.js`，确认 service worker 可用
+完成后会停掉预览服务。建议在 Cloudflare Pages 或容器环境中手动断网验证缓存命中情况。
+
+## ☁️ 部署
+
+### Cloudflare Pages
+
+1. `npm run build`
+2. 上传 `dist/` 目录或在控制台配置 Build 命令：`npm run build`
+3. 部署完成后即可离线访问（浏览器首次访问需联网缓存）
+
+### 容器部署
 
 项目内置多阶段构建的 `Dockerfile`，将静态资源编译并由 Nginx 提供服务。
 
@@ -87,11 +104,11 @@ docker run -d --name xget-web -p 8080:80 xget-web
 
 如需自定义 Nginx 行为，可修改 `deploy/nginx.conf` 并重新构建镜像。
 
-## 🧪 推荐测试
+## 🧪 推荐验证
 
-- `npm run dev` 下手动验证不同平台 URL 的转换结果
-- 使用 `npm run build && npm run preview` 检查构建产物结构
-- 上线前建议配合 Cloudflare 或容器环境做一次端到端冒烟
+- `npm run dev` 下验证常见平台 URL 与异常输入（缺协议、非支持域）
+- `npm run test` 检查转换规则是否覆盖常见场景
+- `npm run smoke:offline` 结合浏览器断网模式，确认缓存命中
 
 ## 📚 参考资料
 
