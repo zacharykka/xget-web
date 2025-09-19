@@ -1,14 +1,37 @@
-import { useMemo, useState } from "react";
-import { Check, Copy, Link2 } from "lucide-react";
+import { useCallback, useMemo, useReducer } from "react";
 import { convertToXget, DEFAULT_XGET_BASE, normalizeInputUrl } from "./platforms";
 import { trackEvent } from "./analytics";
+import { useCopyToClipboard } from "./hooks/useCopyToClipboard";
+import { URLInput } from "./components/URLInput";
+import { URLOutput } from "./components/URLOutput";
 
 const configuredBase = (import.meta.env.VITE_XGET_BASE as string | undefined)?.trim();
 const RESOLVED_BASE = configuredBase && configuredBase.length > 0 ? configuredBase : DEFAULT_XGET_BASE;
 
+interface State {
+  sourceUrl: string;
+}
+
+type Action =
+  | { type: "SET_SOURCE_URL"; value: string };
+
+const initialState: State = {
+  sourceUrl: ""
+};
+
+function reducer(state: State, action: Action): State {
+  switch (action.type) {
+    case "SET_SOURCE_URL":
+      return { ...state, sourceUrl: action.value };
+    default:
+      return state;
+  }
+}
+
 function App() {
-  const [sourceUrl, setSourceUrl] = useState("");
-  const [copied, setCopied] = useState(false);
+  const [state, dispatch] = useReducer(reducer, initialState);
+  const { sourceUrl } = state;
+  const { copied, isPending: isCopyPending, copy } = useCopyToClipboard();
 
   const result = useMemo(() => convertToXget(sourceUrl, RESOLVED_BASE), [sourceUrl]);
   const hasError = Boolean(sourceUrl.trim() && !result.ok);
@@ -23,12 +46,14 @@ function App() {
     return result.message ?? "请确认 URL 是否正确";
   }, [result, sourceUrl]);
 
-  const statusClass = `status ${hasError ? "status-warn" : "status-success"}`;
+  const handleSourceChange = useCallback((value: string) => {
+    dispatch({ type: "SET_SOURCE_URL", value });
+  }, []);
 
-  const handleBlur = () => {
+  const handleInputBlur = useCallback(() => {
     const normalized = normalizeInputUrl(sourceUrl);
     if (normalized !== sourceUrl) {
-      setSourceUrl(normalized);
+      dispatch({ type: "SET_SOURCE_URL", value: normalized });
     }
     if (!normalized) {
       return;
@@ -39,23 +64,25 @@ function App() {
     } else {
       trackEvent("conversion_failed", { reason: evaluation.message ?? "unknown" });
     }
-  };
+  }, [sourceUrl]);
 
-  const handleCopy = async () => {
+  const handleCopy = useCallback(async () => {
     if (!result.ok || !result.output) {
       return;
     }
-    try {
-      await navigator.clipboard.writeText(result.output);
-      setCopied(true);
-      trackEvent("copy_success", { platform: result.platform?.id, inputHost: result.input?.hostname });
-      setTimeout(() => setCopied(false), 2000);
-    } catch (error) {
-      console.error("复制失败", error);
-      trackEvent("copy_failed", { message: (error as Error).message });
-      setCopied(false);
-    }
-  };
+    await copy(result.output, {
+      onSuccess: () => trackEvent("copy_success", { platform: result.platform?.id, inputHost: result.input?.hostname }),
+      onError: (error) => trackEvent("copy_failed", { message: error.message })
+    });
+  }, [copy, result]);
+
+  const status = useMemo(
+    () => ({
+      message: hintText,
+      hasError
+    }),
+    [hintText, hasError]
+  );
 
   return (
     <div className="page">
@@ -65,55 +92,15 @@ function App() {
           <p>输入原始地址，立即获得 Xget 加速格式。</p>
         </header>
 
-        <div className="input-group">
-          <label htmlFor="source" className="label">
-            原始 URL
-          </label>
-          <div className="input-wrapper">
-            <Link2 className="input-icon" size={18} />
-            <input
-              id="source"
-              className={`input ${hasError ? "input-error" : ""}`}
-              value={sourceUrl}
-              placeholder="https://github.com/owner/repo"
-              onChange={(event) => setSourceUrl(event.target.value)}
-              onBlur={handleBlur}
-              aria-invalid={hasError}
-              aria-describedby="source-status"
-            />
-          </div>
-          {hintText ? (
-            <div className={statusClass} id="source-status" role={hasError ? "alert" : "status"}>
-              <span className={hasError ? "dot dot-warn" : "dot dot-success"} />
-              <span>{hintText}</span>
-            </div>
-          ) : null}
-        </div>
+        <URLInput value={sourceUrl} onValueChange={handleSourceChange} onBlur={handleInputBlur} status={status} statusId="source-status" />
 
-        <div className="input-group">
-          <label htmlFor="output" className="label">
-            转换后的 Xget URL
-          </label>
-          <div className="output-row">
-            <input
-              id="output"
-              className="input output"
-              value={result.output ?? ""}
-              readOnly
-              placeholder="转换结果将显示在这里"
-            />
-            <button
-              type="button"
-              className="copy-btn"
-              onClick={handleCopy}
-              disabled={!result.ok}
-              aria-label="复制转换后的 URL"
-            >
-              {copied ? <Check size={18} /> : <Copy size={18} />} {copied ? "已复制" : "复制"}
-            </button>
-          </div>
-          <p className="hint">转换时会自动使用后台配置的 Xget 实例域名。</p>
-        </div>
+        <URLOutput
+          value={result.output ?? ""}
+          canCopy={result.ok}
+          onCopy={handleCopy}
+          copied={copied}
+          isCopyPending={isCopyPending}
+        />
       </section>
     </div>
   );
