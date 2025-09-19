@@ -1,0 +1,7 @@
+name = "xget-url-converter"
+compatibility_date = "2024-02-27"
+pages_build_output_dir = "dist"
+
+[vars]
+# 可以在此处配置自定义默认 Xget 域名
+# XGET_BASE = "https://xget.example.com"
