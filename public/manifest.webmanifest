@@ -1,0 +1,17 @@
+{
+  "name": "Xget URL 转换器",
+  "short_name": "Xget转换",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#f5f9ff",
+  "theme_color": "#1554f6",
+  "description": "将主流平台资源地址转换为 Xget 加速格式",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

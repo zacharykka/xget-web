@@ -10,6 +10,60 @@ export interface PlatformRule {
 
 export const DEFAULT_XGET_BASE = "https://xget.xi-xu.me";
 
+const SCHEME_REGEX = /^[a-zA-Z][a-zA-Z\d+.-]*:/;
+
+export function normalizeInputUrl(rawUrl: string): string {
+  const trimmed = rawUrl.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  if (trimmed.startsWith("//")) {
+    return `https:${trimmed}`;
+  }
+
+  if (SCHEME_REGEX.test(trimmed)) {
+    return trimmed;
+  }
+
+  return `https://${trimmed}`;
+}
+
+type HostList = string[];
+
+const GITHUB_HOSTS: HostList = [
+  "github.com",
+  "gist.github.com",
+  "raw.githubusercontent.com",
+  "codeload.github.com",
+  "objects.githubusercontent.com",
+  "media.githubusercontent.com",
+  "githubusercontent.com"
+];
+
+const HUGGING_FACE_HOSTS: HostList = [
+  "huggingface.co",
+  "cdn-lfs.huggingface.co"
+];
+
+const CIVITAI_HOSTS: HostList = [
+  "civitai.com",
+  "cdn.civitai.com"
+];
+
+const CONTAINER_HOSTS: HostList = [
+  "ghcr.io",
+  "registry.k8s.io",
+  "k8s.gcr.io",
+  "gcr.io",
+  "index.docker.io",
+  "registry-1.docker.io",
+  "docker.io",
+  "quay.io",
+  "mcr.microsoft.com",
+  "public.ecr.aws"
+];
+
 export const PLATFORM_RULES: PlatformRule[] = [
   {
     id: "homebrew",
@@ -24,7 +78,7 @@ export const PLATFORM_RULES: PlatformRule[] = [
     id: "github",
     name: "GitHub",
     prefix: "gh",
-    hosts: ["github.com", "gist.github.com"],
+    hosts: GITHUB_HOSTS,
     description: "GitHub 仓库、发行版与 Gist 全量支持",
     transformPath: (url) => url.pathname.replace(/^\//, "")
   },
@@ -32,7 +86,7 @@ export const PLATFORM_RULES: PlatformRule[] = [
     id: "gitlab",
     name: "GitLab",
     prefix: "gl",
-    hosts: ["gitlab.com"],
+    hosts: ["gitlab.com", "gitlab-static.net"],
     description: "GitLab SaaS 站点资源",
     transformPath: (url) => url.pathname.replace(/^\//, "")
   },
@@ -56,7 +110,7 @@ export const PLATFORM_RULES: PlatformRule[] = [
     id: "sourceforge",
     name: "SourceForge",
     prefix: "sf",
-    hosts: ["sourceforge.net"],
+    hosts: ["sourceforge.net", "downloads.sourceforge.net", "downloads.sf.net"],
     description: "SourceForge 项目下载",
     transformPath: (url) => url.pathname.replace(/^\//, "")
   },
@@ -72,7 +126,7 @@ export const PLATFORM_RULES: PlatformRule[] = [
     id: "huggingface",
     name: "Hugging Face",
     prefix: "hf",
-    hosts: ["huggingface.co"],
+    hosts: HUGGING_FACE_HOSTS,
     description: "模型、数据集与推理接口",
     transformPath: (url) => url.pathname.replace(/^\//, "")
   },
@@ -80,7 +134,7 @@ export const PLATFORM_RULES: PlatformRule[] = [
     id: "civitai",
     name: "Civitai",
     prefix: "civitai",
-    hosts: ["civitai.com"],
+    hosts: CIVITAI_HOSTS,
     description: "AI 模型市场",
     transformPath: (url) => url.pathname.replace(/^\//, "")
   },
@@ -88,7 +142,7 @@ export const PLATFORM_RULES: PlatformRule[] = [
     id: "npm",
     name: "npm",
     prefix: "npm",
-    hosts: ["registry.npmjs.org"],
+    hosts: ["registry.npmjs.org", "registry.yarnpkg.com"],
     description: "npm 官方注册表",
     transformPath: (url) => url.pathname.replace(/^\//, "")
   },
@@ -134,7 +188,7 @@ export const PLATFORM_RULES: PlatformRule[] = [
     id: "gradle",
     name: "Gradle",
     prefix: "gradle",
-    hosts: ["plugins.gradle.org"],
+    hosts: ["plugins.gradle.org", "services.gradle.org"],
     description: "Gradle 插件门户",
     transformPath: (url) => url.pathname.replace(/^\//, "")
   },
@@ -182,8 +236,23 @@ export const PLATFORM_RULES: PlatformRule[] = [
     id: "container",
     name: "容器注册表",
     prefix: "cr",
-    hosts: ["ghcr.io", "registry.k8s.io", "k8s.gcr.io", "gcr.io", "index.docker.io", "registry-1.docker.io", "quay.io"],
+    hosts: CONTAINER_HOSTS,
     description: "常见容器镜像仓库",
+    transformPath: (url) => url.pathname.replace(/^\//, "")
+  },
+  {
+    id: "ai-provider",
+    name: "AI 推理提供商",
+    prefix: "ip",
+    hosts: [
+      "api.openai.com",
+      "api.anthropic.com",
+      "generativelanguage.googleapis.com",
+      "api.mistral.ai",
+      "api.cohere.ai",
+      "api.groq.com"
+    ],
+    description: "AI 推理 API 入口",
     transformPath: (url) => url.pathname.replace(/^\//, "")
   }
 ];
@@ -198,13 +267,14 @@ export interface ConvertResult {
 
 // 将原始URL转换为Xget加速URL
 export function convertToXget(rawUrl: string, base = DEFAULT_XGET_BASE): ConvertResult {
-  if (!rawUrl.trim()) {
-    return { ok: false, message: "请输入待转换的 URL" };
+  const normalizedInput = normalizeInputUrl(rawUrl);
+  if (!normalizedInput) {
+    return { ok: false, message: "" };
   }
 
   let parsed: URL;
   try {
-    parsed = new URL(rawUrl.trim());
+    parsed = new URL(normalizedInput);
   } catch (error) {
     return { ok: false, message: "URL 格式不合法，请确保包含 http(s)://" };
   }

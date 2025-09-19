@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Check, Copy, Link2 } from "lucide-react";
-import { convertToXget, DEFAULT_XGET_BASE } from "./platforms";
+import { convertToXget, DEFAULT_XGET_BASE, normalizeInputUrl } from "./platforms";
+import { trackEvent } from "./analytics";
 
 const configuredBase = (import.meta.env.VITE_XGET_BASE as string | undefined)?.trim();
 const RESOLVED_BASE = configuredBase && configuredBase.length > 0 ? configuredBase : DEFAULT_XGET_BASE;
@@ -10,17 +11,35 @@ function App() {
   const [copied, setCopied] = useState(false);
 
   const result = useMemo(() => convertToXget(sourceUrl, RESOLVED_BASE), [sourceUrl]);
+  const hasError = Boolean(sourceUrl.trim() && !result.ok);
 
   const hintText = useMemo(() => {
     if (!sourceUrl.trim()) {
       return "";
     }
-    return result.ok && result.platform
-      ? `已检测到 ${result.platform.name}（前缀 ${result.platform.prefix}）`
-      : result.message ?? "请确认 URL 是否正确";
+    if (result.ok && result.platform) {
+      return `已检测到 ${result.platform.name}（前缀 ${result.platform.prefix}）`;
+    }
+    return result.message ?? "请确认 URL 是否正确";
   }, [result, sourceUrl]);
 
-  const statusClass = result.ok ? "status status-success" : "status status-warn";
+  const statusClass = `status ${hasError ? "status-warn" : "status-success"}`;
+
+  const handleBlur = () => {
+    const normalized = normalizeInputUrl(sourceUrl);
+    if (normalized !== sourceUrl) {
+      setSourceUrl(normalized);
+    }
+    if (!normalized) {
+      return;
+    }
+    const evaluation = convertToXget(normalized, RESOLVED_BASE);
+    if (evaluation.ok) {
+      trackEvent("conversion_detected", { platform: evaluation.platform?.id });
+    } else {
+      trackEvent("conversion_failed", { reason: evaluation.message ?? "unknown" });
+    }
+  };
 
   const handleCopy = async () => {
     if (!result.ok || !result.output) {
@@ -29,9 +48,11 @@ function App() {
     try {
       await navigator.clipboard.writeText(result.output);
       setCopied(true);
+      trackEvent("copy_success", { platform: result.platform?.id, inputHost: result.input?.hostname });
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
       console.error("复制失败", error);
+      trackEvent("copy_failed", { message: (error as Error).message });
       setCopied(false);
     }
   };
@@ -52,15 +73,18 @@ function App() {
             <Link2 className="input-icon" size={18} />
             <input
               id="source"
-              className="input"
+              className={`input ${hasError ? "input-error" : ""}`}
               value={sourceUrl}
               placeholder="https://github.com/owner/repo"
               onChange={(event) => setSourceUrl(event.target.value)}
+              onBlur={handleBlur}
+              aria-invalid={hasError}
+              aria-describedby="source-status"
             />
           </div>
           {hintText ? (
-            <div className={statusClass}>
-              <span className={result.ok ? "dot dot-success" : "dot dot-warn"} />
+            <div className={statusClass} id="source-status" role={hasError ? "alert" : "status"}>
+              <span className={hasError ? "dot dot-warn" : "dot dot-success"} />
               <span>{hintText}</span>
             </div>
           ) : null}

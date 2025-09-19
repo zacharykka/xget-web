@@ -9,5 +9,13 @@ export default defineConfig({
   },
   preview: {
     port: 4173
+  },
+  test: {
+    environment: "node",
+    watch: false,
+    server: {
+      host: "127.0.0.1",
+      port: 0
+    }
   }
 });

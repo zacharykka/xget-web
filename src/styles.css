@@ -184,18 +184,6 @@ a {
 .copy-btn:not(:disabled):hover {
   transform: translateY(-1px);
   box-shadow: 0 10px 18px rgba(22, 163, 74, 0.18);
-}.support p {
-  margin: 0 auto;
-  max-width: 640px;
-  color: #4d5f7a;
-}.platform-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}.platform-card p {
-  margin: 0;
-  color: #63728d;
-  font-size: 0.9rem;
 }
 
 @media (max-width: 640px) {
@@ -218,4 +206,13 @@ a {
   margin: 0;
   color: #6b7a95;
   font-size: 0.85rem;
+}
+.input-error {
+  border-color: rgba(224, 36, 94, 0.6);
+  box-shadow: 0 0 0 2px rgba(240, 82, 115, 0.15);
+}
+
+.input-error:focus {
+  border-color: #e0245e;
+  box-shadow: 0 0 0 4px rgba(224, 36, 94, 0.2);
 }
