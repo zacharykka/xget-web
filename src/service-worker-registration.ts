@@ -9,6 +9,15 @@ export function registerServiceWorker() {
     return;
   }
 
+  navigator.serviceWorker.addEventListener("message", (event) => {
+    if (event.data?.type === "SW_ACTIVATED") {
+      window.dispatchEvent(new CustomEvent("sw:activated", { detail: event.data }));
+      if (import.meta.env.DEV) {
+        console.info(`[sw] activated version ${event.data.version ?? "unknown"}`);
+      }
+    }
+  });
+
   window.addEventListener("load", () => {
     navigator.serviceWorker
       .register(SW_PATH)
