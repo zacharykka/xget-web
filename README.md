@@ -62,23 +62,33 @@ npm run preview
 - `VITE_ANALYTICS_ENDPOINT=https://example.com/collect` ：设置埋点上报服务地址
 - `VITE_ANALYTICS_BATCH_SIZE=10`（可选）：队列长度到达阈值立即 flush，默认 `5`
 - `VITE_ANALYTICS_FLUSH_INTERVAL=15000`（可选）：批量定时上报间隔（毫秒），默认 `10000`
+- `VITE_ANALYTICS_TIMEOUT=4000`（可选）：上报请求超时时间（毫秒），默认 `4000`
 
 ### PWA
 
 - manifest 与 Service Worker 已自动注册，部署后可在浏览器 DevTools 的 Application 面板看到缓存内容
+- Service Worker 采用导航请求网络优先、静态资源缓存优先的策略，并在激活时发送版本消息（监听 `sw:activated` 事件可提示用户刷新）
+
+### 安全头部
+
+- `deploy/nginx.conf` 示例已包含 CSP，请根据埋点域名调整 `connect-src` 白名单
+- Cloudflare Pages 可在 `_headers` 文件中配置等效 CSP 规则
 
 ## 🧪 测试与冒烟
 
 ```bash
 npm run test          # Vitest 单元测试
+npm run test:e2e      # Playwright 端到端测试（需先启动预览服务或设定 PLAYWRIGHT_BASE_URL）
 npm run smoke:offline # 构建 + preview + 关键文件探活
 ```
 
 > Vitest 在受限环境下可能输出一次 `listen EPERM 0.0.0.0:24678`，为沙箱阻止监听端口所致，不影响测试结论。
 
+> Playwright 测试需提前执行 `npm run preview -- --host 127.0.0.1 --port 4173`（或自定义 `PLAYWRIGHT_BASE_URL`），再运行 `npm run test:e2e`。
+
 离线冒烟脚本会自动：
 1. 执行生产构建
-2. 启动 `npm run preview -- --host 127.0.0.1 --port 5010`
+2. 启动 `npm run preview -- --host 127.0.0.1 --port 5010`（如沙箱阻止监听，将自动回退到 dist 静态检查）
 3. 拉取 `index.html` 及 `sw.js`，确认 service worker 可用
 完成后会停掉预览服务。建议在 Cloudflare Pages 或容器环境中手动断网验证缓存命中情况。
 
